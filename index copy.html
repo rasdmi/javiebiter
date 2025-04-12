@@ -16,20 +16,29 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 48px;
+            font-size: 64px;
             font-weight: bold;
             color: #222;
             z-index: 5;
+            text-align: center;
         }
 
-        #bar {
+        #score::after {
+            content: "\Aквок в баре";
+            white-space: pre;
+            display: block;
+            font-size: 24px;
+        }
+
+        #house {
             position: absolute;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
             z-index: 2;
+            transition: transform 0.2s ease;
         }
 
         .quokka, .collie {
@@ -37,22 +46,20 @@
             width: 80px;
             height: 80px;
             z-index: 3;
+            transition: transform 0.2s ease;
         }
     </style>
 </head>
 <body>
 
-<!-- Центрированный счётчик -->
 <div id="score">0</div>
+<img src="assets/house.png" id="house" alt="House">
+<audio id="burpSound" src="assets/burp.wav"></audio>
 
-<!-- Игрушечный бар в верхней части экрана -->
-<img src="assets/bar.png" id="bar" alt="Bar">
-
-<!-- Контейнер для динамически добавляемых квок -->
 <script>
-// Получаем ссылки на бар и счётчик
-const bar = document.getElementById("bar");
+const house = document.getElementById("house");
 const scoreDisplay = document.getElementById("score");
+const burpSound = document.getElementById("burpSound");
 let score = 0;
 
 const quokkas = [];
@@ -61,41 +68,36 @@ collie.className = "collie";
 collie.src = "assets/collie_down.png";
 document.body.appendChild(collie);
 
-let collieDirection = "down";
-
-// Позиция колли
 let collieX = window.innerWidth / 2;
 let collieY = window.innerHeight / 2;
-
-// Обновление позиции собаки к курсору
 let targetX = collieX;
 let targetY = collieY;
 
+const quokkaImgs = {
+    up: "quokka_up.png",
+    down: "quokka_down.png",
+    left: "quokka_left.png",
+    right: "quokka_right.png"
+};
+
+const minDistToEdge = 40;
+const minSeparation = 20;
+const maxSeparation = 40;
+const dogReactionRange = 250 * 0.66;
+const directionChangeInterval = 2000;
+
+// Движение мыши
 document.addEventListener("mousemove", (e) => {
     targetX = e.clientX;
     targetY = e.clientY;
-
-    const dx = targetX - collieX;
-    const dy = targetY - collieY;
-
-    if (Math.abs(dx) > Math.abs(dy)) {
-        collieDirection = dx > 0 ? "right" : "left";
-    } else {
-        collieDirection = dy > 0 ? "down" : "up";
-    }
-
-    collie.src = "assets/collie_" + collieDirection + ".png";
 });
-
-// Создаём квок
-const quokkaImgs = ["quokka_1.png", "quokka_2.png", "quokka_3.png", "quokka_4.png"];
 
 for (let i = 0; i < 15; i++) {
     const q = document.createElement("img");
     q.className = "quokka";
-    q.src = "assets/" + quokkaImgs[i % quokkaImgs.length];
-    q.style.left = Math.random() * (window.innerWidth - 80) + "px";
-    q.style.top = Math.random() * (window.innerHeight - 80) + "px";
+    q.src = "assets/quokka_down.png";
+    q.style.left = Math.random() * (window.innerWidth - 160) + 80 + "px";
+    q.style.top = Math.random() * (window.innerHeight - 160) + 80 + "px";
     document.body.appendChild(q);
     quokkas.push({
         el: q,
@@ -103,44 +105,57 @@ for (let i = 0; i < 15; i++) {
         y: parseFloat(q.style.top),
         vx: Math.random() * 2 - 1,
         vy: Math.random() * 2 - 1,
+        lastDirChange: Date.now()
     });
 }
 
-// Главный цикл анимации
 function animate() {
-    // Движение колли
     const dx = targetX - collieX;
     const dy = targetY - collieY;
     const dist = Math.sqrt(dx*dx + dy*dy);
     if (dist > 1) {
-        collieX += dx / dist * 2.5;
-        collieY += dy / dist * 2.5;
+        collieX += dx / dist * 5; // скорость собаки увеличена
+        collieY += dy / dist * 5;
     }
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+        collie.src = dx > 0 ? "assets/collie_left.png" : "assets/collie_right.png";
+    } else {
+        collie.src = dy > 0 ? "assets/collie_up.png" : "assets/collie_down.png";
+    }
+
     collie.style.left = collieX + "px";
     collie.style.top = collieY + "px";
 
-    // Движение квок
     quokkas.forEach((q, idx) => {
+        const now = Date.now();
         const cx = collieX - q.x;
         const cy = collieY - q.y;
         const d = Math.sqrt(cx*cx + cy*cy);
-        if (d < 250) {
+        if (d < dogReactionRange) {
             q.vx -= cx / d * 0.5;
             q.vy -= cy / d * 0.5;
         }
 
-        // Притяжение к остальным (как стадо)
+        // Отталкивание от других квок
         quokkas.forEach((other, j) => {
-            if (i !== j) {
-                const ox = other.x - q.x;
-                const oy = other.y - q.y;
+            if (idx !== j) {
+                const ox = q.x - other.x;
+                const oy = q.y - other.y;
                 const od = Math.sqrt(ox*ox + oy*oy);
-                if (od < 100) {
-                    q.vx += ox / od * 0.05;
-                    q.vy += oy / od * 0.05;
+                if (od < minSeparation) {
+                    q.vx += ox / od * 0.2;
+                    q.vy += oy / od * 0.2;
                 }
             }
         });
+
+        // Не чаще чем раз в 2 сек меняют направление
+        if (now - q.lastDirChange > directionChangeInterval) {
+            q.vx += (Math.random() - 0.5) * 0.5;
+            q.vy += (Math.random() - 0.5) * 0.5;
+            q.lastDirChange = now;
+        }
 
         q.vx *= 0.95;
         q.vy *= 0.95;
@@ -148,19 +163,39 @@ function animate() {
         q.x += q.vx;
         q.y += q.vy;
 
+        q.x = Math.max(minDistToEdge, Math.min(window.innerWidth - 80 - minDistToEdge, q.x));
+        q.y = Math.max(minDistToEdge, Math.min(window.innerHeight - 80 - minDistToEdge, q.y));
+
         q.el.style.left = q.x + "px";
         q.el.style.top = q.y + "px";
 
-        const barRect = bar.getBoundingClientRect();
+        // Смена направления картинки
+        if (Math.abs(q.vx) > Math.abs(q.vy)) {
+            q.el.src = q.vx > 0 ? "assets/" + quokkaImgs.right : "assets/" + quokkaImgs.left;
+        } else {
+            q.el.src = q.vy > 0 ? "assets/" + quokkaImgs.down : "assets/" + quokkaImgs.up;
+        }
+
+        const houseRect = house.getBoundingClientRect();
         const qRect = q.el.getBoundingClientRect();
         if (
-            qRect.left < barRect.right &&
-            qRect.right > barRect.left &&
-            qRect.top < barRect.bottom &&
-            qRect.bottom > barRect.top
+            qRect.left < houseRect.right &&
+            qRect.right > houseRect.left &&
+            qRect.top < houseRect.bottom &&
+            qRect.bottom > houseRect.top
         ) {
-            q.el.remove();
-            quokkas.splice(idx, 1);
+            burpSound.currentTime = 0;
+            burpSound.play();
+
+            house.style.transform = "translateX(-50%) scale(1.3)";
+            setTimeout(() => house.style.transform = "translateX(-50%) scale(1)", 200);
+
+            q.el.style.transform = "scale(0)";
+            setTimeout(() => {
+                q.el.remove();
+                quokkas.splice(idx, 1);
+            }, 200);
+
             score++;
             scoreDisplay.textContent = score;
         }
@@ -170,5 +205,6 @@ function animate() {
 }
 animate();
 </script>
+
 </body>
 </html>
