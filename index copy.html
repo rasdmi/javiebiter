@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quokka Herding Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #a6e3a1, #94d5a1);
+            font-family: sans-serif;
+        }
+
+        #score {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            font-weight: bold;
+            color: #222;
+            z-index: 5;
+        }
+
+        #bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 80px;
+            z-index: 2;
+        }
+
+        .quokka, .collie {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            z-index: 3;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Центрированный счётчик -->
+<div id="score">0</div>
+
+<!-- Игрушечный бар в верхней части экрана -->
+<img src="assets/bar.png" id="bar" alt="Bar">
+
+<!-- Контейнер для динамически добавляемых квок -->
+<script>
+// Получаем ссылки на бар и счётчик
+const bar = document.getElementById("bar");
+const scoreDisplay = document.getElementById("score");
+let score = 0;
+
+const quokkas = [];
+const collie = document.createElement("img");
+collie.className = "collie";
+collie.src = "assets/collie_down.png";
+document.body.appendChild(collie);
+
+let collieDirection = "down";
+
+// Позиция колли
+let collieX = window.innerWidth / 2;
+let collieY = window.innerHeight / 2;
+
+// Обновление позиции собаки к курсору
+let targetX = collieX;
+let targetY = collieY;
+
+document.addEventListener("mousemove", (e) => {
+    targetX = e.clientX;
+    targetY = e.clientY;
+
+    const dx = targetX - collieX;
+    const dy = targetY - collieY;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+        collieDirection = dx > 0 ? "right" : "left";
+    } else {
+        collieDirection = dy > 0 ? "down" : "up";
+    }
+
+    collie.src = "assets/collie_" + collieDirection + ".png";
+});
+
+// Создаём квок
+const quokkaImgs = ["quokka_1.png", "quokka_2.png", "quokka_3.png", "quokka_4.png"];
+
+for (let i = 0; i < 15; i++) {
+    const q = document.createElement("img");
+    q.className = "quokka";
+    q.src = "assets/" + quokkaImgs[i % quokkaImgs.length];
+    q.style.left = Math.random() * (window.innerWidth - 80) + "px";
+    q.style.top = Math.random() * (window.innerHeight - 80) + "px";
+    document.body.appendChild(q);
+    quokkas.push({
+        el: q,
+        x: parseFloat(q.style.left),
+        y: parseFloat(q.style.top),
+        vx: Math.random() * 2 - 1,
+        vy: Math.random() * 2 - 1,
+    });
+}
+
+// Главный цикл анимации
+function animate() {
+    // Движение колли
+    const dx = targetX - collieX;
+    const dy = targetY - collieY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > 1) {
+        collieX += dx / dist * 2.5;
+        collieY += dy / dist * 2.5;
+    }
+    collie.style.left = collieX + "px";
+    collie.style.top = collieY + "px";
+
+    // Движение квок
+    quokkas.forEach((q, idx) => {
+        const cx = collieX - q.x;
+        const cy = collieY - q.y;
+        const d = Math.sqrt(cx*cx + cy*cy);
+        if (d < 250) {
+            q.vx -= cx / d * 0.5;
+            q.vy -= cy / d * 0.5;
+        }
+
+        // Притяжение к остальным (как стадо)
+        quokkas.forEach((other, j) => {
+            if (i !== j) {
+                const ox = other.x - q.x;
+                const oy = other.y - q.y;
+                const od = Math.sqrt(ox*ox + oy*oy);
+                if (od < 100) {
+                    q.vx += ox / od * 0.05;
+                    q.vy += oy / od * 0.05;
+                }
+            }
+        });
+
+        q.vx *= 0.95;
+        q.vy *= 0.95;
+
+        q.x += q.vx;
+        q.y += q.vy;
+
+        q.el.style.left = q.x + "px";
+        q.el.style.top = q.y + "px";
+
+        const barRect = bar.getBoundingClientRect();
+        const qRect = q.el.getBoundingClientRect();
+        if (
+            qRect.left < barRect.right &&
+            qRect.right > barRect.left &&
+            qRect.top < barRect.bottom &&
+            qRect.bottom > barRect.top
+        ) {
+            q.el.remove();
+            quokkas.splice(idx, 1);
+            score++;
+            scoreDisplay.textContent = score;
+        }
+    });
+
+    requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
