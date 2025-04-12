@@ -107,7 +107,7 @@ const minDistToEdge = 40;
 const minSeparation = 40;
 const dogReactionRange = 250 * 0.66;
 const directionChangeInterval = 2000;
-const edibleEmojis = ["🍎", "🍌", "🍇", "🍉", "🍓", "🥑", "🥕", "🍍", "🥭", "🍒"];
+const edibleEmojis = ["🍷", "🍺", "🍸", "🥂", "🎨", "🎸", "🎭", "📸", "🏀", "⚽", "🥊", "⛷"];
 
 // Мышь
 addEventListener("mousemove", e => {
@@ -133,9 +133,16 @@ function spawnQuokka() {
 }
 
 for (let i = 0; i < 15; i++) spawnQuokka();
+      // Перки для 2 случайных квок
+      const perkIndices = quokkas.length > 2 ? [...Array(quokkas.length).keys()].sort(() => 0.5 - Math.random()).slice(0, 2) : [];
+      for (const index of perkIndices) {
+        const perk = Math.floor(Math.random() * 5);
+        quokkas[index].perk = perk;
+        quokkas[index].perkTime = Date.now();
+      }
 
 function updateEmojiCounter() {
-  emojiCounter.textContent = Object.entries(emojiStats).map(([e, c]) => `${e} ${c}`).join("  ");
+    emojiCounter.textContent = Object.entries(emojiStats).map(([e, c]) => `${e} ${c}`).join("  ");
 }
 
 function spawnEmoji() {
@@ -265,6 +272,117 @@ function animate() {
       scoreDisplay.textContent = score;
     }
   }
+
+  // обработка перков
+  quokkas.forEach((q, i) => {
+    if (!q.perk) return;
+    const age = Date.now() - (q.perkTime || 0);
+
+    switch (q.perk) {
+      case 0: // телепорт каждые 10 сек
+        if (age > 10000) {
+          q.perkTime = Date.now();
+          const flash = document.createElement("div");
+          flash.style.position = "absolute";
+          flash.style.width = "80px";
+          flash.style.height = "80px";
+          flash.style.background = "white";
+          flash.style.borderRadius = "50%";
+          flash.style.opacity = "0.8";
+          flash.style.left = q.x + "px";
+          flash.style.top = q.y + "px";
+          flash.style.zIndex = 10;
+          document.body.appendChild(flash);
+          setTimeout(() => flash.remove(), 300);
+          q.x = Math.random() * (window.innerWidth - 160) + 80;
+          q.y = Math.random() * (window.innerHeight - 160) + 80;
+        }
+        break;
+      case 1: // самоуничтожение
+        if (age > 10000) {
+          q.el.style.transition = "transform 0.2s ease, opacity 0.2s ease";
+          q.el.style.transform = "scale(2) rotate(720deg)";
+          q.el.style.opacity = 0;
+          const blood = document.createElement("div");
+          blood.style.position = "absolute";
+          blood.style.width = "60px";
+          blood.style.height = "60px";
+          blood.style.background = "red";
+          blood.style.borderRadius = "50%";
+          blood.style.left = q.x + "px";
+          blood.style.top = q.y + "px";
+          document.body.appendChild(blood);
+          setTimeout(() => blood.remove(), 1000);
+          setTimeout(() => q.el.remove(), 300);
+          quokkas.splice(i, 1);
+        }
+        break;
+      case 2: // паутина
+        if (age > 10000) {
+          q.perkTime = Date.now();
+          const web = document.createElement("div");
+          web.style.position = "absolute";
+          web.style.width = "80px";
+          web.style.height = "80px";
+          web.style.background = "#ccc";
+          web.style.borderRadius = "50%";
+          web.style.left = q.x + "px";
+          web.style.top = q.y + "px";
+          web.style.zIndex = 10;
+          document.body.appendChild(web);
+          setTimeout(() => web.remove(), 500);
+          q.x = Math.random() * (window.innerWidth - 160) + 80;
+          q.y = Math.random() * (window.innerHeight - 160) + 80;
+        }
+        break;
+      case 3: // крюк
+        if (age > 10000) {
+          q.perkTime = Date.now();
+          const others = quokkas.filter((_, j) => j !== i);
+          if (others.length === 0) return;
+          const target = others[Math.floor(Math.random() * others.length)];
+          const line = document.createElement("div");
+          line.style.position = "absolute";
+          line.style.background = "black";
+          line.style.zIndex = 9;
+          const dx = target.x - q.x;
+          const dy = target.y - q.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          line.style.width = len + "px";
+          line.style.height = "2px";
+          line.style.left = q.x + "px";
+          line.style.top = q.y + "px";
+          line.style.transformOrigin = "left center";
+          line.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+          document.body.appendChild(line);
+          setTimeout(() => line.remove(), 300);
+          target.x = q.x;
+          target.y = q.y;
+        }
+        break;
+      case 4: // отталкивание собаки
+        if (age > 10000) {
+          q.perkTime = Date.now();
+          const repulse = document.createElement("div");
+          repulse.style.position = "absolute";
+          repulse.style.width = "100px";
+          repulse.style.height = "100px";
+          repulse.style.border = "3px solid blue";
+          repulse.style.borderRadius = "50%";
+          repulse.style.left = q.x - 10 + "px";
+          repulse.style.top = q.y - 10 + "px";
+          repulse.style.zIndex = 8;
+          document.body.appendChild(repulse);
+          setTimeout(() => repulse.remove(), 300);
+          const dx = collieX - q.x;
+          const dy = collieY - q.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          collieX += (dx / d) * 200;
+          collieY += (dy / d) * 200;
+        }
+        break;
+    }
+  });
 
   requestAnimationFrame(animate);
 }
