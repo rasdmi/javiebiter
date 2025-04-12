@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,7 +8,7 @@
     body {
       margin: 0;
       overflow: hidden;
-      background: linear-gradient(to bottom, #a6e3a1, #94d5a1);
+      background: url("assets/image.png") center center / cover repeat;
       font-family: sans-serif;
     }
 
@@ -45,8 +46,8 @@
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      width: 100px;
-      height: 100px;
+      width: 250px;
+      height: 250px;
       z-index: 2;
       transition: transform 0.2s ease;
     }
@@ -67,60 +68,85 @@
       height: auto;
       z-index: 4;
     }
-
-    #clickMarker {
-      position: absolute;
-      width: 32px;
-      height: 32px;
-      background-image: url('assets/paw.png'); /* добавь своё изображение лапки */
-      background-size: contain;
-      background-repeat: no-repeat;
-      pointer-events: none;
-      z-index: 10;
-      opacity: 0.8;
-      transition: opacity 0.2s;
-    }
   </style>
 </head>
 <body>
 
 <div id="score">0</div>
 <div id="emojiCount"></div>
-<div id="clickMarker" style="display: none;"></div>
 <img src="assets/house.png" id="house" alt="House">
 <audio id="burpSound" src="assets/burp.wav"></audio>
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+  const socket = io("http://localhost:3000");
+
+  let collieIsMoving = false;
+  let collieX = window.innerWidth / 2;
+  let collieY = window.innerHeight / 2;
+
+  function sendMoveStart(x, y) {
+    socket.emit("moveStart", { x: Math.round(x), y: Math.round(y) });
+    collieIsMoving = true;
+  }
+
+  function sendMoveEnd(x, y) {
+    socket.emit("moveEnd", { x: Math.round(x), y: Math.round(y) });
+    collieIsMoving = false;
+  }
+
+  window.addEventListener("keydown", () => {
+    if (!collieIsMoving) sendMoveStart(collieX, collieY);
+  });
+
+  window.addEventListener("keyup", () => {
+    if (collieIsMoving) sendMoveEnd(collieX, collieY);
+  });
+
+  let mouseMoveTimer = null;
+  window.addEventListener("mousemove", () => {
+    if (!collieIsMoving) sendMoveStart(collieX, collieY);
+    clearTimeout(mouseMoveTimer);
+    mouseMoveTimer = setTimeout(() => {
+      if (collieIsMoving) sendMoveEnd(collieX, collieY);
+    }, 300);
+  });
+</script>
 
 <script>
 const house = document.getElementById("house");
 const scoreDisplay = document.getElementById("score");
 const emojiCounter = document.getElementById("emojiCount");
 const burpSound = document.getElementById("burpSound");
-const clickMarker = document.getElementById("clickMarker");
 
 let score = 0;
 const emojiStats = {};
 const quokkas = [];
+
+const houseImages = [
+  "assets/house.png",
+  "assets/house1.png",
+  "assets/house2.png",
+  "assets/house3.png",
+  "assets/house4.png",
+  "assets/house5.png"
+];
 
 const collie = document.createElement("img");
 collie.className = "collie";
 collie.src = "assets/collie_down.png";
 document.body.appendChild(collie);
 
-let collieX = window.innerWidth / 2;
-let collieY = window.innerHeight / 2;
 let targetX = collieX;
 let targetY = collieY;
 let keysPressed = {};
+let lastCollieSwitch = 0;
 
 addEventListener("keydown", e => keysPressed[e.key] = true);
 addEventListener("keyup", e => keysPressed[e.key] = false);
-addEventListener("click", e => {
+addEventListener("mousemove", e => {
   targetX = e.clientX;
   targetY = e.clientY;
-  clickMarker.style.left = (targetX - 16) + "px";
-  clickMarker.style.top = (targetY - 16) + "px";
-  clickMarker.style.display = "block";
-  clickMarker.style.opacity = 0.8;
 });
 
 const quokkaImgs = {
@@ -219,20 +245,17 @@ function animate() {
     if (dist > 1) {
       collieX += mx / dist * 5;
       collieY += my / dist * 5;
-
-      // лапка исчезает при приближении
-      if (dist < 100) {
-        clickMarker.style.opacity = Math.max(0, (dist - 20) / 80);
-        if (dist < 22) {
-          clickMarker.style.display = "none";
-        }
-      }
     }
   }
 
-  collie.src = Math.abs(dx || targetX - collieX) > Math.abs(dy || targetY - collieY)
-    ? ((dx || (targetX - collieX)) > 0 ? "assets/collie_left.png" : "assets/collie_right.png")
-    : ((dy || (targetY - collieY)) > 0 ? "assets/collie_down.png" : "assets/collie_up.png");
+  if (now - lastCollieSwitch > 500) {
+    lastCollieSwitch = now;
+    const cx = targetX - collieX;
+    const cy = targetY - collieY;
+    collie.src = Math.abs(dx || cx) > Math.abs(dy || cy)
+      ? ((dx || cx) > 0 ? "assets/collie_left.png" : "assets/collie_right.png")
+      : ((dy || cy) > 0 ? "assets/collie_down.png" : "assets/collie_up.png");
+  }
 
   collie.style.left = collieX + "px";
   collie.style.top = collieY + "px";
@@ -302,6 +325,18 @@ function animate() {
       quokkas.splice(i, 1);
       score++;
       scoreDisplay.textContent = score;
+
+      // Рандомная смена домика каждые 10 квок
+      
+      if (score % 10 === 0) {
+        let currentSrc = house.src.split('/').pop(); // Получаем имя файла без пути
+        let newHouse;
+        do {
+          newHouse = houseImages[Math.floor(Math.random() * houseImages.length)];
+        } while (newHouse.includes(currentSrc)); // Сравниваем только имена файлов
+        house.src = newHouse;
+      }
+    
     }
   }
 
@@ -309,6 +344,5 @@ function animate() {
 }
 animate();
 </script>
-
 </body>
 </html>
