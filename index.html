@@ -67,6 +67,17 @@
       height: auto;
       z-index: 4;
     }
+    .click-effect {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border: 2px solid #222;
+  border-radius: 50%;
+  opacity: 0.6;
+  z-index: 100;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  transform: scale(1);
+}
   </style>
 </head>
 <body>
@@ -75,319 +86,218 @@
 <div id="emojiCount"></div>
 <img src="assets/house.png" id="house" alt="House">
 <audio id="burpSound" src="assets/burp.wav"></audio>
-
 <script>
-const house = document.getElementById("house");
-const scoreDisplay = document.getElementById("score");
-const emojiCounter = document.getElementById("emojiCount");
-const burpSound = document.getElementById("burpSound");
-let score = 0;
-const emojiStats = {};
-
-const quokkas = [];
-const collie = document.createElement("img");
-collie.className = "collie";
-collie.src = "assets/collie_down.png";
-document.body.appendChild(collie);
-
-let collieX = window.innerWidth / 2;
-let collieY = window.innerHeight / 2;
-let targetX = collieX;
-let targetY = collieY;
-let lastCollieSwitch = 0;
-
-const quokkaImgs = {
-  up: "quokka_up.png",
-  down: "quokka_down.png",
-  left: "quokka_left.png",
-  right: "quokka_right.png"
-};
-
-const minDistToEdge = 40;
-const minSeparation = 40;
-const dogReactionRange = 250 * 0.66;
-const directionChangeInterval = 2000;
-const edibleEmojis = ["🍷", "🍺", "🍸", "🥂", "🎨", "🎸", "🎭", "📸", "🏀", "⚽", "🥊", "⛷"];
-
-// Мышь
-addEventListener("mousemove", e => {
-  targetX = e.clientX;
-  targetY = e.clientY;
-});
-
-function spawnQuokka() {
-  const q = document.createElement("img");
-  q.className = "quokka";
-  q.src = "assets/quokka_down.png";
-  q.style.left = Math.random() * (window.innerWidth - 160) + 80 + "px";
-  q.style.top = Math.random() * (window.innerHeight - 160) + 80 + "px";
-  document.body.appendChild(q);
-  quokkas.push({
-    el: q,
-    x: parseFloat(q.style.left),
-    y: parseFloat(q.style.top),
-    vx: Math.random() * 2 - 1,
-    vy: Math.random() * 2 - 1,
-    lastDirChange: Date.now()
-  });
-}
-
-for (let i = 0; i < 15; i++) spawnQuokka();
-      // Перки для 2 случайных квок
-      const perkIndices = quokkas.length > 2 ? [...Array(quokkas.length).keys()].sort(() => 0.5 - Math.random()).slice(0, 2) : [];
-      for (const index of perkIndices) {
-        const perk = Math.floor(Math.random() * 5);
-        quokkas[index].perk = perk;
-        quokkas[index].perkTime = Date.now();
-      }
-
-function updateEmojiCounter() {
-    emojiCounter.textContent = Object.entries(emojiStats).map(([e, c]) => `${e} ${c}`).join("  ");
-}
-
-function spawnEmoji() {
-  const emoji = document.createElement("div");
-  emoji.className = "emoji";
-  const type = edibleEmojis[Math.floor(Math.random() * edibleEmojis.length)];
-  emoji.textContent = type;
-  emoji.style.left = Math.random() * (window.innerWidth - 40) + "px";
-  emoji.style.top = window.innerHeight + "px";
-  document.body.appendChild(emoji);
-
-  let y = window.innerHeight;
-  const interval = setInterval(() => {
-    y -= 2;
-    emoji.style.top = y + "px";
-    const collieRect = collie.getBoundingClientRect();
-    const emojiRect = emoji.getBoundingClientRect();
-    if (
-      emojiRect.left < collieRect.right &&
-      emojiRect.right > collieRect.left &&
-      emojiRect.top < collieRect.bottom &&
-      emojiRect.bottom > collieRect.top
-    ) {
-      clearInterval(interval);
-      emoji.remove();
-      emojiStats[type] = (emojiStats[type] || 0) + 1;
-      updateEmojiCounter();
-      spawnQuokka();
-      return;
+    const house = document.getElementById("house");
+    const scoreDisplay = document.getElementById("score");
+    const emojiCounter = document.getElementById("emojiCount");
+    const burpSound = document.getElementById("burpSound");
+    let score = 0;
+    const emojiStats = {};
+    
+    const quokkas = [];
+    const collie = document.createElement("img");
+    collie.className = "collie";
+    collie.src = "assets/collie_down.png";
+    document.body.appendChild(collie);
+    
+    let collieX = window.innerWidth / 2;
+    let collieY = window.innerHeight / 2;
+    let targetX = collieX;
+    let targetY = collieY;
+    let lastCollieSwitch = 0;
+    let keysPressed = {};
+    
+    addEventListener("keydown", e => keysPressed[e.key] = true);
+    addEventListener("keyup", e => keysPressed[e.key] = false);
+    addEventListener("mousemove", e => {
+      targetX = e.clientX;
+      targetY = e.clientY;
+    });
+    
+    const quokkaImgs = {
+      up: "quokka_up.png",
+      down: "quokka_down.png",
+      left: "quokka_left.png",
+      right: "quokka_right.png"
+    };
+    
+    const minDistToEdge = 40;
+    const minSeparation = 40;
+    const dogReactionRange = 250 * 0.66;
+    const directionChangeInterval = 2000;
+    const edibleEmojis = ["🍷", "🍺", "🍸", "🥂", "🎨", "🎸", "🎭", "📸", "🏀", "⚽", "🥊", "⛷"];
+    
+    function spawnQuokka() {
+      const q = document.createElement("img");
+      q.className = "quokka";
+      q.src = "assets/quokka_down.png";
+      q.style.left = Math.random() * (window.innerWidth - 160) + 80 + "px";
+      q.style.top = Math.random() * (window.innerHeight - 160) + 80 + "px";
+      document.body.appendChild(q);
+      quokkas.push({
+        el: q,
+        x: parseFloat(q.style.left),
+        y: parseFloat(q.style.top),
+        vx: Math.random() * 2 - 1,
+        vy: Math.random() * 2 - 1,
+        lastDirChange: Date.now()
+      });
     }
-    if (y <= window.innerHeight / 2) {
-      clearInterval(interval);
-      emoji.remove();
+    
+    for (let i = 0; i < 15; i++) spawnQuokka();
+    
+    function updateEmojiCounter() {
+      emojiCounter.textContent = Object.entries(emojiStats).map(([e, c]) => `${e} ${c}`).join("  ");
     }
-  }, 30);
-}
-
-setInterval(() => {
-  const count = 1 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < count; i++) spawnEmoji();
-}, 1000);
-
-function animate() {
-  const dx = targetX - collieX;
-  const dy = targetY - collieY;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist > 1) {
-    collieX += dx / dist * 5;
-    collieY += dy / dist * 5;
-  }
-
-  const now = Date.now();
-  if (now - lastCollieSwitch > 500) {
-    lastCollieSwitch = now;
-    collie.src = Math.abs(dx) > Math.abs(dy)
-      ? (dx > 0 ? "assets/collie_left.png" : "assets/collie_right.png")
-      : (dy > 0 ? "assets/collie_up.png" : "assets/collie_down.png");
-  }
-
-  collie.style.left = collieX + "px";
-  collie.style.top = collieY + "px";
-
-  for (let i = quokkas.length - 1; i >= 0; i--) {
-    const q = quokkas[i];
-    const cx = collieX - q.x;
-    const cy = collieY - q.y;
-    const d = Math.sqrt(cx * cx + cy * cy);
-    const isScared = d < dogReactionRange;
-
-    if (!isScared && now - q.lastDirChange > directionChangeInterval) {
-      q.vx = (Math.random() - 0.5) * 4;
-      q.vy = (Math.random() - 0.5) * 4;
-      q.lastDirChange = now;
-    } else if (isScared) {
-      q.vx -= cx / d * 0.5;
-      q.vy -= cy / d * 0.5;
+    
+    function spawnEmoji() {
+      const emoji = document.createElement("div");
+      emoji.className = "emoji";
+      const type = edibleEmojis[Math.floor(Math.random() * edibleEmojis.length)];
+      emoji.textContent = type;
+      emoji.style.left = Math.random() * (window.innerWidth - 40) + "px";
+      emoji.style.top = window.innerHeight + "px";
+      document.body.appendChild(emoji);
+    
+      let y = window.innerHeight;
+      const interval = setInterval(() => {
+        y -= 2;
+        emoji.style.top = y + "px";
+        const collieRect = collie.getBoundingClientRect();
+        const emojiRect = emoji.getBoundingClientRect();
+        if (
+          emojiRect.left < collieRect.right &&
+          emojiRect.right > collieRect.left &&
+          emojiRect.top < collieRect.bottom &&
+          emojiRect.bottom > collieRect.top
+        ) {
+          clearInterval(interval);
+          emoji.remove();
+          emojiStats[type] = (emojiStats[type] || 0) + 1;
+          updateEmojiCounter();
+          spawnQuokka();
+          return;
+        }
+        if (y <= window.innerHeight / 2) {
+          clearInterval(interval);
+          emoji.remove();
+        }
+      }, 30);
     }
-
-    for (let j = 0; j < quokkas.length; j++) {
-      if (i !== j) {
-        const other = quokkas[j];
-        const ox = q.x - other.x;
-        const oy = q.y - other.y;
-        const od = Math.sqrt(ox * ox + oy * oy);
-        if (od < minSeparation && od > 0) {
-          q.vx += ox / od * 0.3;
-          q.vy += oy / od * 0.3;
-        } else if (!isScared && od < 200) {
-          q.vx -= ox / od * 0.05;
-          q.vy -= oy / od * 0.05;
+    
+    setInterval(() => {
+      const count = 1 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < count; i++) spawnEmoji();
+    }, 1000);
+    
+    function animate() {
+      const now = Date.now();
+      let dx = 0, dy = 0;
+    
+      if (keysPressed["ArrowLeft"] || keysPressed["a"]) dx = -1;
+      if (keysPressed["ArrowRight"] || keysPressed["d"]) dx = 1;
+      if (keysPressed["ArrowUp"] || keysPressed["w"]) dy = -1;
+      if (keysPressed["ArrowDown"] || keysPressed["s"]) dy = 1;
+    
+      if (dx !== 0 || dy !== 0) {
+        const len = Math.sqrt(dx * dx + dy * dy);
+        collieX += (dx / len) * 5;
+        collieY += (dy / len) * 5;
+      } else {
+        // движение за мышкой, если клавиши не нажаты
+        const mx = targetX - collieX;
+        const my = targetY - collieY;
+        const dist = Math.sqrt(mx * mx + my * my);
+        if (dist > 1) {
+          collieX += mx / dist * 5;
+          collieY += my / dist * 5;
         }
       }
-    }
-
-    q.vx *= 0.95;
-    q.vy *= 0.95;
-
-    q.x += q.vx;
-    q.y += q.vy;
-
-    q.x = Math.max(minDistToEdge, Math.min(window.innerWidth - 80 - minDistToEdge, q.x));
-    q.y = Math.max(minDistToEdge, Math.min(window.innerHeight - 80 - minDistToEdge, q.y));
-
-    q.el.style.left = q.x + "px";
-    q.el.style.top = q.y + "px";
-
-    q.el.src = Math.abs(q.vx) > Math.abs(q.vy)
-      ? (q.vx > 0 ? "assets/" + quokkaImgs.right : "assets/" + quokkaImgs.left)
-      : (q.vy > 0 ? "assets/" + quokkaImgs.down : "assets/" + quokkaImgs.up);
-
-    const houseRect = house.getBoundingClientRect();
-    const qRect = q.el.getBoundingClientRect();
-    if (
-      qRect.left < houseRect.right &&
-      qRect.right > houseRect.left &&
-      qRect.top < houseRect.bottom &&
-      qRect.bottom > houseRect.top
-    ) {
-      burpSound.currentTime = 0;
-      burpSound.play();
-      house.style.transform = "translateX(-50%) scale(1.3)";
-      setTimeout(() => house.style.transform = "translateX(-50%) scale(1)", 200);
-      q.el.style.transform = "scale(0)";
-      setTimeout(() => q.el.remove(), 200);
-      quokkas.splice(i, 1);
-      score++;
-      scoreDisplay.textContent = score;
-    }
-  }
-
-  // обработка перков
-  quokkas.forEach((q, i) => {
-    if (!q.perk) return;
-    const age = Date.now() - (q.perkTime || 0);
-
-    switch (q.perk) {
-      case 0: // телепорт каждые 10 сек
-        if (age > 10000) {
-          q.perkTime = Date.now();
-          const flash = document.createElement("div");
-          flash.style.position = "absolute";
-          flash.style.width = "80px";
-          flash.style.height = "80px";
-          flash.style.background = "white";
-          flash.style.borderRadius = "50%";
-          flash.style.opacity = "0.8";
-          flash.style.left = q.x + "px";
-          flash.style.top = q.y + "px";
-          flash.style.zIndex = 10;
-          document.body.appendChild(flash);
-          setTimeout(() => flash.remove(), 300);
-          q.x = Math.random() * (window.innerWidth - 160) + 80;
-          q.y = Math.random() * (window.innerHeight - 160) + 80;
+    
+      if (now - lastCollieSwitch > 500) {
+        lastCollieSwitch = now;
+        const cx = targetX - collieX;
+        const cy = targetY - collieY;
+        collie.src = Math.abs(dx || cx) > Math.abs(dy || cy)
+          ? ((dx || cx) > 0 ? "assets/collie_left.png" : "assets/collie_right.png")
+          : ((dy || cy) > 0 ? "assets/collie_down.png" : "assets/collie_up.png");
+      }
+    
+      collie.style.left = collieX + "px";
+      collie.style.top = collieY + "px";
+    
+      for (let i = quokkas.length - 1; i >= 0; i--) {
+        const q = quokkas[i];
+        const cx = collieX - q.x;
+        const cy = collieY - q.y;
+        const d = Math.sqrt(cx * cx + cy * cy);
+        const isScared = d < dogReactionRange;
+    
+        if (!isScared && now - q.lastDirChange > directionChangeInterval) {
+          q.vx = (Math.random() - 0.5) * 4;
+          q.vy = (Math.random() - 0.5) * 4;
+          q.lastDirChange = now;
+        } else if (isScared) {
+          q.vx -= cx / d * 0.5;
+          q.vy -= cy / d * 0.5;
         }
-        break;
-      case 1: // самоуничтожение
-        if (age > 10000) {
-          q.el.style.transition = "transform 0.2s ease, opacity 0.2s ease";
-          q.el.style.transform = "scale(2) rotate(720deg)";
-          q.el.style.opacity = 0;
-          const blood = document.createElement("div");
-          blood.style.position = "absolute";
-          blood.style.width = "60px";
-          blood.style.height = "60px";
-          blood.style.background = "red";
-          blood.style.borderRadius = "50%";
-          blood.style.left = q.x + "px";
-          blood.style.top = q.y + "px";
-          document.body.appendChild(blood);
-          setTimeout(() => blood.remove(), 1000);
-          setTimeout(() => q.el.remove(), 300);
+    
+        for (let j = 0; j < quokkas.length; j++) {
+          if (i !== j) {
+            const other = quokkas[j];
+            const ox = q.x - other.x;
+            const oy = q.y - other.y;
+            const od = Math.sqrt(ox * ox + oy * oy);
+            if (od < minSeparation && od > 0) {
+              q.vx += ox / od * 0.3;
+              q.vy += oy / od * 0.3;
+            } else if (!isScared && od < 200) {
+              q.vx -= ox / od * 0.05;
+              q.vy -= oy / od * 0.05;
+            }
+          }
+        }
+    
+        q.vx *= 0.95;
+        q.vy *= 0.95;
+    
+        q.x += q.vx;
+        q.y += q.vy;
+    
+        q.x = Math.max(minDistToEdge, Math.min(window.innerWidth - 80 - minDistToEdge, q.x));
+        q.y = Math.max(minDistToEdge, Math.min(window.innerHeight - 80 - minDistToEdge, q.y));
+    
+        q.el.style.left = q.x + "px";
+        q.el.style.top = q.y + "px";
+    
+        q.el.src = Math.abs(q.vx) > Math.abs(q.vy)
+          ? (q.vx > 0 ? "assets/" + quokkaImgs.right : "assets/" + quokkaImgs.left)
+          : (q.vy > 0 ? "assets/" + quokkaImgs.down : "assets/" + quokkaImgs.up);
+    
+        const houseRect = house.getBoundingClientRect();
+        const qRect = q.el.getBoundingClientRect();
+        if (
+          qRect.left < houseRect.right &&
+          qRect.right > houseRect.left &&
+          qRect.top < houseRect.bottom &&
+          qRect.bottom > houseRect.top
+        ) {
+          burpSound.currentTime = 0;
+          burpSound.play();
+          house.style.transform = "translateX(-50%) scale(1.3)";
+          setTimeout(() => house.style.transform = "translateX(-50%) scale(1)", 200);
+          q.el.style.transform = "scale(0)";
+          setTimeout(() => q.el.remove(), 200);
           quokkas.splice(i, 1);
+          score++;
+          scoreDisplay.textContent = score;
         }
-        break;
-      case 2: // паутина
-        if (age > 10000) {
-          q.perkTime = Date.now();
-          const web = document.createElement("div");
-          web.style.position = "absolute";
-          web.style.width = "80px";
-          web.style.height = "80px";
-          web.style.background = "#ccc";
-          web.style.borderRadius = "50%";
-          web.style.left = q.x + "px";
-          web.style.top = q.y + "px";
-          web.style.zIndex = 10;
-          document.body.appendChild(web);
-          setTimeout(() => web.remove(), 500);
-          q.x = Math.random() * (window.innerWidth - 160) + 80;
-          q.y = Math.random() * (window.innerHeight - 160) + 80;
-        }
-        break;
-      case 3: // крюк
-        if (age > 10000) {
-          q.perkTime = Date.now();
-          const others = quokkas.filter((_, j) => j !== i);
-          if (others.length === 0) return;
-          const target = others[Math.floor(Math.random() * others.length)];
-          const line = document.createElement("div");
-          line.style.position = "absolute";
-          line.style.background = "black";
-          line.style.zIndex = 9;
-          const dx = target.x - q.x;
-          const dy = target.y - q.y;
-          const len = Math.sqrt(dx * dx + dy * dy);
-          line.style.width = len + "px";
-          line.style.height = "2px";
-          line.style.left = q.x + "px";
-          line.style.top = q.y + "px";
-          line.style.transformOrigin = "left center";
-          line.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
-          document.body.appendChild(line);
-          setTimeout(() => line.remove(), 300);
-          target.x = q.x;
-          target.y = q.y;
-        }
-        break;
-      case 4: // отталкивание собаки
-        if (age > 10000) {
-          q.perkTime = Date.now();
-          const repulse = document.createElement("div");
-          repulse.style.position = "absolute";
-          repulse.style.width = "100px";
-          repulse.style.height = "100px";
-          repulse.style.border = "3px solid blue";
-          repulse.style.borderRadius = "50%";
-          repulse.style.left = q.x - 10 + "px";
-          repulse.style.top = q.y - 10 + "px";
-          repulse.style.zIndex = 8;
-          document.body.appendChild(repulse);
-          setTimeout(() => repulse.remove(), 300);
-          const dx = collieX - q.x;
-          const dy = collieY - q.y;
-          const d = Math.sqrt(dx * dx + dy * dy);
-          collieX += (dx / d) * 200;
-          collieY += (dy / d) * 200;
-        }
-        break;
+      }
+    
+      requestAnimationFrame(animate);
     }
-  });
-
-  requestAnimationFrame(animate);
-}
-animate();
-</script>
-
+    animate();
+    </script>
+    
 </body>
 </html>
