@@ -344,5 +344,56 @@ function animate() {
 }
 animate();
 </script>
+<script>
+  const otherPlayers = {};
+  
+  socket.on("init", ({ id, players }) => {
+    console.log("INIT received", players);
+    for (const [playerId, pos] of Object.entries(players)) {
+      if (playerId !== id) {
+        addOtherPlayer(playerId, pos.x, pos.y);
+      }
+    }
+  });
+  
+  socket.on("newPlayer", ({ id, x, y }) => {
+    console.log("New player joined:", id);
+    addOtherPlayer(id, x, y);
+  });
+  
+  socket.on("playerMoved", ({ id, x, y }) => {
+    const player = otherPlayers[id];
+    if (player) {
+      player.style.left = x + "px";
+      player.style.top = y + "px";
+    }
+  });
+  
+  socket.on("playerStopped", ({ id, x, y }) => {
+    const player = otherPlayers[id];
+    if (player) {
+      player.style.left = x + "px";
+      player.style.top = y + "px";
+    }
+  });
+  
+  socket.on("playerLeft", (id) => {
+    if (otherPlayers[id]) {
+      otherPlayers[id].remove();
+      delete otherPlayers[id];
+    }
+  });
+  
+  function addOtherPlayer(id, x, y) {
+    const player = document.createElement("img");
+    player.src = "assets/collie_right.png";
+    player.className = "collie";
+    player.style.left = x + "px";
+    player.style.top = y + "px";
+    player.style.border = "2px solid red"; // 👈 чтобы выделить других
+    document.body.appendChild(player);
+    otherPlayers[id] = player;
+  }
+  </script>  
 </body>
 </html>
